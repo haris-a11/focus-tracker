@@ -1,0 +1,8 @@
+{
+  "name": "Focus Tracker",
+  "description": "A simple panel button to add tasks,track time spent on tasks with stopwatch and pomodoro timer, and view statistics.",
+  "uuid": "focus-tracker@haris11.local",
+  "url": "https://github.com/haris-a11/focus-tracker-haris11.local",
+  "shell-version": ["46", "47", "48"],
+  "settings-schema": "org.gnome.shell.extensions.focus-tracker"
+}
