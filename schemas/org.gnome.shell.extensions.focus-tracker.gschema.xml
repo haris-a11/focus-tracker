@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<schemalist>
+  <schema
+      id="org.gnome.shell.extensions.focus-tracker"
+      path="/org/gnome/shell/extensions/focus-tracker/">
+    <key name="active-task" type="s">
+      <default>'Focus'</default>
+      <summary>Active task</summary>
+      <description>
+        The currently active task.
+      </description>
+    </key>
+
+    <key name="tasks-list" type="as">
+      <default>["Focus"]</default>
+      <summary>List of tasks</summary>
+      <description>
+        The list of tasks to track.
+      </description>
+    </key>
+  </schema>
+</schemalist>                                                                                                                                                               

@@ -30,9 +30,9 @@ function format(us) {
 
 const focusButton = GObject.registerClass(
   class FocusButton extends PanelMenu.Button {
-    _init(uuid) {
+    _init(uuid, settings) {
       super._init(0.5, "Focus tracker button");
-
+      this._settings = settings;
       this._box = new St.BoxLayout({
         style_class: "focus-box",
       });
@@ -59,15 +59,50 @@ const focusButton = GObject.registerClass(
       this._accumulated = 0;
 
       this._label.visible = false;
+      this._currentTask = new PopupMenu.PopupMenuItem("", { reactive: false });
+      this._taskMenu = new PopupMenu.PopupSubMenuMenuItem("Select task");
+      this.menu.addMenuItem(this._currentTask);
+      this.menu.addMenuItem(this._taskMenu);
+
+      this._settings.connectObject(
+        "changed::tasks-list",
+        () => this._refreshTasks(),
+        "changed::active-task",
+        () => this._refreshTasks(),
+        this,
+      );
+
+      this._refreshTasks();
+
+      this.menu.addMenuItem(this._taskMenu);
 
       const resetItem = new PopupMenu.PopupMenuItem("Reset");
-
       resetItem.connect("activate", () => {
         this._reset();
+        this._saveTask();
       });
 
       this.menu.addMenuItem(resetItem);
     }
+
+    _saveTask() {}
+    _refreshTasks() {
+      const active = this._settings.get_string("active-task");
+      this._currentTask.label.text = `Task: ${active || "none"}`;
+      this._taskMenu.menu.removeAll();
+
+      this._settings.get_strv("tasks-list").forEach((task) => {
+        const item = new PopupMenu.PopupMenuItem(task);
+        item.setOrnament(
+          task === active ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE,
+        );
+        item.connect("activate", () =>
+          this._settings.set_string("active-task", task),
+        );
+        this._taskMenu.menu.addMenuItem(item);
+      });
+    }
+
     vfunc_event(event) {
       if (event.type() === Clutter.EventType.BUTTON_PRESS) {
         const button = event.get_button();
@@ -154,14 +189,14 @@ const focusButton = GObject.registerClass(
 );
 export default class FocusTracker extends Extension {
   enable() {
-    // this._settings = this.getSettings();
-
-    this._indicator = new focusButton(this.uuid);
+    this._settings = this.getSettings();
+    this._indicator = new focusButton(this.uuid, this._settings);
     Main.panel.addToStatusArea(this.uuid, this._indicator);
   }
 
   disable() {
     this._indicator.destroy();
     this._indicator = null;
+    this._settings = null;
   }
 }
