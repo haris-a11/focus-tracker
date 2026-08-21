@@ -210,13 +210,19 @@ const focusButton = GObject.registerClass(
 export default class FocusTracker extends Extension {
   enable() {
     this._settings = this.getSettings();
-    this._store = new SessionStore(this.uuid);
+
+    this._store = new SessionStore(this.uuid, (message) =>
+      Main.notifyError("Focus Tracker", message),
+    );
+
     this._store.load().catch((e) => {
       logError(e, "focus-tracker: failed to load session store");
     });
+
     this._indicator = new focusButton(this._settings, this._store, () =>
       this.openPreferences(),
     );
+
     Main.panel.addToStatusArea(this.uuid, this._indicator);
   }
 

@@ -23,7 +23,9 @@ const decoder = new TextDecoder();
 
 export async function readSessions(uuid) {
   const { file } = getFile(uuid);
-  return readFile(file);
+  const { sessions } = await readFile(file);
+
+  return sessions;
 }
 
 export function makeSession(task, start, end, duration) {
@@ -46,11 +48,21 @@ function getFile(uuid) {
 }
 
 async function readFile(file) {
+  let bytes;
+
   try {
-    const [bytes] = await file.load_contents_async(null);
+    [bytes] = await file.load_contents_async(null);
+  } catch (e) {
+    if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
+      return { sessions: [], ok: true };
 
-    if (bytes.length === 0) return [];
+    logError(e, `focus-tracker: failed to read ${file.get_path()}`);
+    return { sessions: [], ok: false };
+  }
 
+  if (bytes.length === 0) return { sessions: [], ok: true };
+
+  try {
     const data = JSON.parse(decoder.decode(bytes));
 
     if (data.version !== DATA_VERSION)
@@ -58,18 +70,15 @@ async function readFile(file) {
 
     if (!Array.isArray(data.sessions)) throw new Error("Invalid sessions data");
 
-    return data.sessions;
+    return { sessions: data.sessions, ok: true };
   } catch (e) {
-    if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND)) {
-      logError(e, `focus-tracker: failed to read ${file.get_path()}`);
-    }
-
-    return [];
+    logError(e, `focus-tracker: ${file.get_path()} is unreadable`);
+    return { sessions: [], ok: false };
   }
 }
 
 export class SessionStore {
-  constructor(uuid) {
+  constructor(uuid, onError = null) {
     const { dir, file } = getFile(uuid);
 
     this._dir = dir;
@@ -78,6 +87,9 @@ export class SessionStore {
     this._sessions = [];
     this._loaded = false;
     this._queue = Promise.resolve();
+
+    this._onError = onError;
+    this._reported = false;
   }
 
   _enqueue(fn) {
@@ -88,11 +100,31 @@ export class SessionStore {
     return result;
   }
 
-  async _ensureLoaded() {
-    if (this._loaded) return;
+  _report(message) {
+    if (this._reported || !this._onError) return;
 
-    this._sessions = await readFile(this._file);
+    this._reported = true;
+    this._onError(message);
+  }
+
+  async _ensureLoaded() {
+    if (this._loaded) return true;
+
+    const { sessions, ok } = await readFile(this._file);
+
+    if (!ok) {
+      this._report(
+        "Could not read your saved sessions. New sessions will not be " +
+          "saved until this is fixed.",
+      );
+      return false;
+    }
+
+    this._sessions = sessions;
     this._loaded = true;
+    this._reported = false;
+
+    return true;
   }
 
   async _writeFile() {
@@ -122,14 +154,19 @@ export class SessionStore {
 
   load() {
     return this._enqueue(async () => {
-      await this._ensureLoaded();
+      if (!(await this._ensureLoaded()))
+        throw new Error("focus-tracker: could not read sessions.json");
+
       return this._sessions;
     });
   }
 
   append(session) {
     return this._enqueue(async () => {
-      await this._ensureLoaded();
+      if (!(await this._ensureLoaded()))
+        throw new Error(
+          "focus-tracker: sessions.json unreadable, refusing to overwrite it",
+        );
 
       this._sessions.push(session);
 
