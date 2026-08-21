@@ -2,8 +2,6 @@ import St from "gi://St";
 import GObject from "gi://GObject";
 import GLib from "gi://GLib";
 import Clutter from "gi://Clutter";
-import Gio from "gi://Gio";
-import Pango from "gi://Pango";
 
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
@@ -11,28 +9,16 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
-Gio._promisify(Gio.File.prototype, "load_contents_async");
-Gio._promisify(Gio.File.prototype, "make_directory_async");
-Gio._promisify(
-  Gio.File.prototype,
-  "replace_contents_bytes_async",
-  "replace_contents_finish",
-);
-
-function format(us) {
-  const ms = Math.floor(us / 1000);
-  const s = Math.floor(ms / 1000) % 60;
-  const m = Math.floor(ms / 60000) % 60;
-  const h = Math.floor(ms / 3600000);
-  const pad = (n) => `${n}`.padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
+import { SessionStore, makeSession } from "./storage.js";
+import { formatClock } from "./utils.js";
 
 const focusButton = GObject.registerClass(
   class FocusButton extends PanelMenu.Button {
-    _init(uuid, settings) {
+    _init(settings, store, openPreferences) {
       super._init(0.5, "Focus tracker button");
       this._settings = settings;
+      this._store = store;
+      this._openPreferences = openPreferences;
       this._box = new St.BoxLayout({
         style_class: "focus-box",
       });
@@ -54,6 +40,7 @@ const focusButton = GObject.registerClass(
       this.add_child(this._box);
 
       this._startedAt = 0;
+      this._sessionStart = null;
       this._timeoutId = 0;
       this._isRunning = false;
       this._accumulated = 0;
@@ -73,19 +60,26 @@ const focusButton = GObject.registerClass(
       );
 
       this._refreshTasks();
+      const statsItem = new PopupMenu.PopupMenuItem("Statistics");
+      statsItem.connect("activate", () => this._openPrefs("statistics"));
+      this.menu.addMenuItem(statsItem);
 
-      this.menu.addMenuItem(this._taskMenu);
+      const tasksItem = new PopupMenu.PopupMenuItem("Manage tasks");
+      tasksItem.connect("activate", () => this._openPrefs("general"));
+      this.menu.addMenuItem(tasksItem);
 
       const resetItem = new PopupMenu.PopupMenuItem("Reset");
       resetItem.connect("activate", () => {
         this._reset();
+      });
+      const saveItem = new PopupMenu.PopupMenuItem("Save");
+      saveItem.connect("activate", () => {
         this._saveTask();
       });
-
+      this.menu.addMenuItem(saveItem);
       this.menu.addMenuItem(resetItem);
     }
 
-    _saveTask() {}
     _refreshTasks() {
       const active = this._settings.get_string("active-task");
       this._currentTask.label.text = `Task: ${active || "none"}`;
@@ -101,6 +95,11 @@ const focusButton = GObject.registerClass(
         );
         this._taskMenu.menu.addMenuItem(item);
       });
+    }
+    _openPrefs(pageName) {
+      this._settings.set_string("prefs-page", pageName);
+      this.menu.close();
+      this._openPreferences();
     }
 
     vfunc_event(event) {
@@ -127,18 +126,21 @@ const focusButton = GObject.registerClass(
     }
 
     _start() {
+      if (!this._sessionStart) {
+        this._sessionStart = GLib.DateTime.new_now_local();
+      }
       this._startedAt = GLib.get_monotonic_time();
       this._isRunning = true;
 
       this._icon.icon_name = "media-playback-pause-symbolic";
 
       this._label.visible = true;
-      this._label.text = format(this._elapsed());
+      this._label.text = formatClock(this._elapsed());
 
       this._stopTicking();
 
-      this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
-        this._label.text = format(this._elapsed());
+      this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+        this._label.text = formatClock(this._elapsed());
         return GLib.SOURCE_CONTINUE;
       });
     }
@@ -165,6 +167,7 @@ const focusButton = GObject.registerClass(
       this._accumulated = 0;
       this._startedAt = 0;
       this._isRunning = false;
+      this._sessionStart = null;
 
       this._icon.icon_name = "alarm-symbolic";
 
@@ -172,6 +175,23 @@ const focusButton = GObject.registerClass(
       this._label.visible = false;
 
       this._stopTicking();
+    }
+    _saveTask() {
+      const elapsed = this._elapsed();
+      if (elapsed <= 0 || !this._sessionStart) return;
+
+      const session = makeSession(
+        this._settings.get_string("active-task") || "none",
+        this._sessionStart,
+        GLib.DateTime.new_now_local(),
+        Math.round(elapsed / 1e6),
+      );
+
+      this._reset();
+
+      this._store
+        .append(session)
+        .catch((e) => logError(e, "focus-tracker: failed to save session"));
     }
 
     _stopTicking() {
@@ -190,7 +210,13 @@ const focusButton = GObject.registerClass(
 export default class FocusTracker extends Extension {
   enable() {
     this._settings = this.getSettings();
-    this._indicator = new focusButton(this.uuid, this._settings);
+    this._store = new SessionStore(this.uuid);
+    this._store.load().catch((e) => {
+      logError(e, "focus-tracker: failed to load session store");
+    });
+    this._indicator = new focusButton(this._settings, this._store, () =>
+      this.openPreferences(),
+    );
     Main.panel.addToStatusArea(this.uuid, this._indicator);
   }
 
@@ -198,5 +224,6 @@ export default class FocusTracker extends Extension {
     this._indicator.destroy();
     this._indicator = null;
     this._settings = null;
+    this._store = null;
   }
 }

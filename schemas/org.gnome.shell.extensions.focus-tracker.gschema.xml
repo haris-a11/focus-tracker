@@ -11,6 +11,11 @@
         The currently active task.
       </description>
     </key>
+    <key name="prefs-page" type="s">
+      <default>'general'</default>
+      <summary>Page to show when preferences open</summary>
+    </key>
+
 
     <key name="tasks-list" type="as">
       <default>["Focus"]</default>
@@ -19,5 +24,8 @@
         The list of tasks to track.
       </description>
     </key>
+
+
+
   </schema>
 </schemalist>                                                                                                                                                               
