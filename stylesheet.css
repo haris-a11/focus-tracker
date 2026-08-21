@@ -1,0 +1,10 @@
+.focus-box {
+  spacing: 4px;
+}
+
+.focus-label {
+  font-feature-settings: "tnum";
+  font-size: 0.9em;
+  font-weight: bold;
+  padding-right: 2px;
+}

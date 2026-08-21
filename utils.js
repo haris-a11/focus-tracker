@@ -1,4 +1,26 @@
-import GLib from "gi://GLib";
+ GLib from "gi://GLib";
+
+
+export const DEFAULT_TASK = "Focus";
+
+export function normaliseTasks(tasks) {
+  const seen = new Set();
+  const out = [];
+
+  for (const task of tasks) {
+    if (typeof task !== "string") continue;
+
+    const name = task.trim();
+    if (!name || seen.has(name)) continue;
+
+    seen.add(name);
+    out.push(name);
+  }
+
+  if (!seen.has(DEFAULT_TASK)) out.unshift(DEFAULT_TASK);
+
+  return out;
+}
 
 export function formatClock(us) {
   const total = Math.floor(us / 1000000);
@@ -44,9 +66,14 @@ export function summarise(sessions) {
   for (const session of sessions) {
     if (!session || typeof session !== "object") continue;
 
-    const duration = Number.isFinite(session.duration) ? session.duration : 0;
+
+    const raw = session.duration_seconds ?? session.duration;
+    const duration = Number.isFinite(raw) ? raw : 0;
+
     const task =
-      typeof session.task === "string" && session.task ? session.task : "none";
+      typeof session.task === "string" && session.task
+        ? session.task
+        : DEFAULT_TASK;
 
     const entry = byTask.get(task) ?? { seconds: 0, count: 0 };
     entry.seconds += duration;
@@ -56,7 +83,7 @@ export function summarise(sessions) {
     total += duration;
     counted += 1;
 
-    const day = localDay(session.startTime);
+    const day = localDay(session.start ?? session.startTime);
     if (day === today) todayTotal += duration;
     if (day && day >= weekStart) weekTotal += duration;
   }
@@ -68,7 +95,7 @@ export function summarise(sessions) {
     total,
     todayTotal,
     weekTotal,
-    weekDays: now.get_day_of_week(), // 1 on Monday … 7 on Sunday
+    weekDays: now.get_day_of_week(), 
     counted,
   };
 }

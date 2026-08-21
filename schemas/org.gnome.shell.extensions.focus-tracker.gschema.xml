@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <schemalist>
   <schema
       id="org.gnome.shell.extensions.focus-tracker"
@@ -11,11 +10,15 @@
         The currently active task.
       </description>
     </key>
+
     <key name="prefs-page" type="s">
       <default>'general'</default>
       <summary>Page to show when preferences open</summary>
+      <description>
+        The name of the preferences page to select when the preferences
+        window is opened.
+      </description>
     </key>
-
 
     <key name="tasks-list" type="as">
       <default>["Focus"]</default>
@@ -24,8 +27,5 @@
         The list of tasks to track.
       </description>
     </key>
-
-
-
   </schema>
-</schemalist>                                                                                                                                                               
+</schemalist>

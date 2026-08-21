@@ -28,13 +28,20 @@ export async function readSessions(uuid) {
   return sessions;
 }
 
-export function makeSession(task, start, end, duration) {
+export function makeSession(
+  task,
+  startTime,
+  endTime,
+  duration,
+  type = "stopwatch",
+) {
   return {
     id: GLib.uuid_string_random(),
     task,
-    startTime: start.format_iso8601(),
-    endTime: end.format_iso8601(),
-    duration,
+    mode: type,
+    start: startTime.format_iso8601(),
+    end: endTime.format_iso8601(),
+    duration_seconds: duration,
   };
 }
 
@@ -56,7 +63,7 @@ async function readFile(file) {
     if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
       return { sessions: [], ok: true };
 
-    logError(e, `focus-tracker: failed to read ${file.get_path()}`);
+    console.error(`focus-tracker: failed to read ${file.get_path()}`, e);
     return { sessions: [], ok: false };
   }
 
@@ -72,7 +79,7 @@ async function readFile(file) {
 
     return { sessions: data.sessions, ok: true };
   } catch (e) {
-    logError(e, `focus-tracker: ${file.get_path()} is unreadable`);
+    console.error(`focus-tracker: ${file.get_path()} is unreadable`, e);
     return { sessions: [], ok: false };
   }
 }

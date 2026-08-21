@@ -4,7 +4,7 @@ import Gtk from "gi://Gtk";
 import { ExtensionPreferences } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 import { readSessions } from "./storage.js";
-import { formatHM, summarise } from "./utils.js";
+import { DEFAULT_TASK, formatHM, normaliseTasks, summarise } from "./utils.js";
 
 function buildTaskTable(perTask) {
   const grid = new Gtk.Grid({
@@ -52,21 +52,23 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
     const settings = (window._settings = this.getSettings());
 
-    window.add(this._buildGeneralPage(settings));
+    window.add(this._buildGeneralPage(settings, window));
     window.add(this._buildStatsPage(window));
 
     const landing = settings.get_string("prefs-page");
     if (landing) window.set_visible_page_name(landing);
 
-    settings.connect("changed::prefs-page", () => {
+    const pageId = settings.connect("changed::prefs-page", () => {
       const name = settings.get_string("prefs-page");
       if (name) window.set_visible_page_name(name);
     });
 
+    window.connect("destroy", () => settings.disconnect(pageId));
+
     window.set_focus(null);
   }
 
-  _buildGeneralPage(settings) {
+  _buildGeneralPage(settings, window) {
     const page = new Adw.PreferencesPage({
       title: "General",
       name: "general",
@@ -90,25 +92,40 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
     const refresh = () => {
       rows.forEach((row) => listGroup.remove(row));
 
-      rows = settings.get_strv("tasks-list").map((task) => {
+      rows = normaliseTasks(settings.get_strv("tasks-list")).map((task) => {
         const row = new Adw.ActionRow({ title: task });
-        const button = new Gtk.Button({
-          icon_name: "list-remove-symbolic",
-          valign: Gtk.Align.CENTER,
-          css_classes: ["flat"],
-        });
 
-        button.connect("clicked", () => {
-          settings.set_strv(
-            "tasks-list",
-            settings.get_strv("tasks-list").filter((t) => t !== task),
+        if (task === DEFAULT_TASK) {
+          row.add_suffix(
+            new Gtk.Label({
+              label: "Default",
+              css_classes: ["dim-label", "caption"],
+              valign: Gtk.Align.CENTER,
+            }),
           );
+        } else {
+          const button = new Gtk.Button({
+            icon_name: "list-remove-symbolic",
+            tooltip_text: `Remove “${task}”`,
+            valign: Gtk.Align.CENTER,
+            css_classes: ["flat"],
+          });
 
-          if (settings.get_string("active-task") === task)
-            settings.set_string("active-task", "");
-        });
+          button.connect("clicked", () => {
+            settings.set_strv(
+              "tasks-list",
+              normaliseTasks(
+                settings.get_strv("tasks-list").filter((t) => t !== task),
+              ),
+            );
 
-        row.add_suffix(button);
+            if (settings.get_string("active-task") === task)
+              settings.set_string("active-task", DEFAULT_TASK);
+          });
+
+          row.add_suffix(button);
+        }
+
         listGroup.add(row);
         return row;
       });
@@ -116,7 +133,7 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
 
     entry.connect("apply", () => {
       const text = entry.get_text().trim();
-      const tasks = settings.get_strv("tasks-list");
+      const tasks = normaliseTasks(settings.get_strv("tasks-list"));
 
       if (text && !tasks.includes(text))
         settings.set_strv("tasks-list", [...tasks, text]);
@@ -124,7 +141,9 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
       entry.set_text("");
     });
 
-    settings.connect("changed::tasks-list", refresh);
+    const tasksId = settings.connect("changed::tasks-list", refresh);
+    window.connect("destroy", () => settings.disconnect(tasksId));
+
     refresh();
 
     return page;
@@ -143,8 +162,6 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
     page.add(summaryGroup);
     page.add(taskGroup);
 
-    // The window can close before the read resolves; adding rows to a
-    // destroyed widget throws.
     let alive = true;
     window.connect("destroy", () => (alive = false));
 
@@ -177,7 +194,9 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
 
         taskGroup.add(buildTaskTable(perTask));
       })
-      .catch((e) => logError(e, "focus-tracker: failed to load statistics"));
+      .catch((e) =>
+        console.error("focus-tracker: failed to load statistics", e),
+      );
 
     return page;
   }

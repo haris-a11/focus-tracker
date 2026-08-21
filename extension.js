@@ -10,7 +10,7 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import { SessionStore, makeSession } from "./storage.js";
-import { formatClock } from "./utils.js";
+import { DEFAULT_TASK, formatClock, normaliseTasks } from "./utils.js";
 
 let sessionStore = null;
 
@@ -23,7 +23,7 @@ function getSessionStore(uuid) {
   return sessionStore;
 }
 
-const focusButton = GObject.registerClass(
+const FocusButton = GObject.registerClass(
   class FocusButton extends PanelMenu.Button {
     _init(settings, store, openPreferences) {
       super._init(0.5, "Focus tracker button");
@@ -91,12 +91,19 @@ const focusButton = GObject.registerClass(
       this.menu.addMenuItem(resetItem);
     }
 
-    _refreshTasks() {
+    _activeTask() {
+      const tasks = normaliseTasks(this._settings.get_strv("tasks-list"));
       const active = this._settings.get_string("active-task");
-      this._currentTask.label.text = `Task: ${active || "none"}`;
+
+      return tasks.includes(active) ? active : DEFAULT_TASK;
+    }
+
+    _refreshTasks() {
+      const active = this._activeTask();
+      this._currentTask.label.text = `Task: ${active}`;
       this._taskMenu.menu.removeAll();
 
-      this._settings.get_strv("tasks-list").forEach((task) => {
+      normaliseTasks(this._settings.get_strv("tasks-list")).forEach((task) => {
         const item = new PopupMenu.PopupMenuItem(task);
         item.setOrnament(
           task === active ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE,
@@ -150,10 +157,14 @@ const focusButton = GObject.registerClass(
 
       this._stopTicking();
 
-      this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
-        this._label.text = formatClock(this._elapsed());
-        return GLib.SOURCE_CONTINUE;
-      });
+      this._timeoutId = GLib.timeout_add_seconds(
+        GLib.PRIORITY_DEFAULT,
+        1,
+        () => {
+          this._label.text = formatClock(this._elapsed());
+          return GLib.SOURCE_CONTINUE;
+        },
+      );
     }
 
     _pause() {
@@ -192,17 +203,20 @@ const focusButton = GObject.registerClass(
       if (elapsed <= 0 || !this._sessionStart) return;
 
       const session = makeSession(
-        this._settings.get_string("active-task") || "none",
+        this._activeTask(),
         this._sessionStart,
         GLib.DateTime.new_now_local(),
         Math.round(elapsed / 1e6),
+        "stopwatch",
       );
 
       this._reset();
 
       this._store
         .append(session)
-        .catch((e) => logError(e, "focus-tracker: failed to save session"));
+        .catch((e) =>
+          console.error("focus-tracker: failed to save session", e),
+        );
     }
 
     _stopTicking() {
@@ -224,10 +238,10 @@ export default class FocusTracker extends Extension {
     this._store = getSessionStore(this.uuid);
 
     this._store.load().catch((e) => {
-      logError(e, "focus-tracker: failed to load session store");
+      console.error("focus-tracker: failed to load session store", e);
     });
 
-    this._indicator = new focusButton(this._settings, this._store, () =>
+    this._indicator = new FocusButton(this._settings, this._store, () =>
       this.openPreferences(),
     );
 
