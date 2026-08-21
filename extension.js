@@ -12,6 +12,17 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { SessionStore, makeSession } from "./storage.js";
 import { formatClock } from "./utils.js";
 
+let sessionStore = null;
+
+function getSessionStore(uuid) {
+  if (!sessionStore)
+    sessionStore = new SessionStore(uuid, (message) =>
+      Main.notifyError("Focus Tracker", message),
+    );
+
+  return sessionStore;
+}
+
 const focusButton = GObject.registerClass(
   class FocusButton extends PanelMenu.Button {
     _init(settings, store, openPreferences) {
@@ -210,10 +221,7 @@ const focusButton = GObject.registerClass(
 export default class FocusTracker extends Extension {
   enable() {
     this._settings = this.getSettings();
-
-    this._store = new SessionStore(this.uuid, (message) =>
-      Main.notifyError("Focus Tracker", message),
-    );
+    this._store = getSessionStore(this.uuid);
 
     this._store.load().catch((e) => {
       logError(e, "focus-tracker: failed to load session store");
@@ -230,6 +238,7 @@ export default class FocusTracker extends Extension {
     this._indicator.destroy();
     this._indicator = null;
     this._settings = null;
+
     this._store = null;
   }
 }
