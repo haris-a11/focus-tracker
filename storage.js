@@ -16,7 +16,6 @@ Gio._promisify(
 Gio._promisify(Gio.File.prototype, "make_directory_async");
 
 const FILE_NAME = "sessions.json";
-const DATA_VERSION = 1;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -72,12 +71,9 @@ async function readFile(file) {
   try {
     const data = JSON.parse(decoder.decode(bytes));
 
-    if (data.version !== DATA_VERSION)
-      throw new Error(`Unsupported data version: ${data.version}`);
+    if (!Array.isArray(data)) throw new Error("Invalid sessions data");
 
-    if (!Array.isArray(data.sessions)) throw new Error("Invalid sessions data");
-
-    return { sessions: data.sessions, ok: true };
+    return { sessions: data, ok: true };
   } catch (e) {
     console.error(`focus-tracker: ${file.get_path()} is unreadable`, e);
     return { sessions: [], ok: false };
@@ -143,12 +139,9 @@ export class SessionStore {
       }
     }
 
-    const data = {
-      version: DATA_VERSION,
-      sessions: this._sessions,
-    };
-
-    const bytes = new GLib.Bytes(encoder.encode(JSON.stringify(data, null, 2)));
+    const bytes = new GLib.Bytes(
+      encoder.encode(JSON.stringify(this._sessions, null, 2)),
+    );
 
     await this._file.replace_contents_bytes_async(
       bytes,

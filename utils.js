@@ -1,5 +1,4 @@
- GLib from "gi://GLib";
-
+import GLib from "gi://GLib";
 
 export const DEFAULT_TASK = "Focus";
 
@@ -66,8 +65,7 @@ export function summarise(sessions) {
   for (const session of sessions) {
     if (!session || typeof session !== "object") continue;
 
-
-    const raw = session.duration_seconds ?? session.duration;
+    const raw = session.duration_seconds;
     const duration = Number.isFinite(raw) ? raw : 0;
 
     const task =
@@ -83,7 +81,7 @@ export function summarise(sessions) {
     total += duration;
     counted += 1;
 
-    const day = localDay(session.start ?? session.startTime);
+    const day = localDay(session.start);
     if (day === today) todayTotal += duration;
     if (day && day >= weekStart) weekTotal += duration;
   }
@@ -95,7 +93,7 @@ export function summarise(sessions) {
     total,
     todayTotal,
     weekTotal,
-    weekDays: now.get_day_of_week(), 
+    weekDays: now.get_day_of_week(),
     counted,
   };
 }
