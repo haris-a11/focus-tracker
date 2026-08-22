@@ -149,7 +149,7 @@ const FocusButton = GObject.registerClass(
       this._startedAt = GLib.get_monotonic_time();
       this._isRunning = true;
 
-      this._icon.icon_name = "media-playback-pause-symbolic";
+      this._icon.icon_name = "emblem-synchronizing-symbolic";
 
       this._label.visible = true;
       this._label.text = formatClock(this._elapsed());
@@ -171,7 +171,7 @@ const FocusButton = GObject.registerClass(
 
       this._isRunning = false;
 
-      this._icon.icon_name = "media-playback-start-symbolic";
+      this._icon.icon_name = "media-playback-pause-symbolic";
 
       this._stopTicking();
     }
