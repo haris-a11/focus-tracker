@@ -71,24 +71,23 @@ const FocusButton = GObject.registerClass(
       );
 
       this._refreshTasks();
-      const statsItem = new PopupMenu.PopupMenuItem("Statistics");
-      statsItem.connect("activate", () => this._openPrefs("statistics"));
-      this.menu.addMenuItem(statsItem);
 
-      const tasksItem = new PopupMenu.PopupMenuItem("Manage tasks");
-      tasksItem.connect("activate", () => this._openPrefs("general"));
-      this.menu.addMenuItem(tasksItem);
-
-      const resetItem = new PopupMenu.PopupMenuItem("Reset");
-      resetItem.connect("activate", () => {
-        this._reset();
-      });
       const saveItem = new PopupMenu.PopupMenuItem("Save");
       saveItem.connect("activate", () => {
         this._saveTask();
       });
       this.menu.addMenuItem(saveItem);
+      const resetItem = new PopupMenu.PopupMenuItem("Reset");
+      resetItem.connect("activate", () => {
+        this._reset();
+      });
       this.menu.addMenuItem(resetItem);
+      const tasksItem = new PopupMenu.PopupMenuItem("Manage tasks");
+      tasksItem.connect("activate", () => this._openPrefs("general"));
+      this.menu.addMenuItem(tasksItem);
+      const statsItem = new PopupMenu.PopupMenuItem("Statistics");
+      statsItem.connect("activate", () => this._openPrefs("statistics"));
+      this.menu.addMenuItem(statsItem);
     }
 
     _activeTask() {

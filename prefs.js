@@ -1,4 +1,5 @@
 import Adw from "gi://Adw";
+import GLib from "gi://GLib";
 import Gtk from "gi://Gtk";
 
 import { ExtensionPreferences } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
@@ -65,7 +66,12 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
 
     window.connect("destroy", () => settings.disconnect(pageId));
 
-    window.set_focus(null);
+    window.connect("map", () => {
+      GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        window.set_focus(null);
+        return GLib.SOURCE_REMOVE;
+      });
+    });
   }
 
   _buildGeneralPage(settings, window) {
@@ -75,15 +81,33 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
       icon_name: "preferences-system-symbolic",
     });
 
-    const entry = new Adw.EntryRow({
-      title: "Add Task",
-      show_apply_button: true,
+    const entry = new Gtk.Entry({
+      placeholder_text: "Task name, e.g. Deep Work",
+      hexpand: true,
+      valign: Gtk.Align.CENTER,
+      margin_top: 8,
+      margin_bottom: 8,
     });
 
-    const addGroup = new Adw.PreferencesGroup({ title: "Task Settings" });
-    const listGroup = new Adw.PreferencesGroup({ title: "Tasks List" });
+    const addButton = new Gtk.Button({
+      icon_name: "list-add-symbolic",
+      tooltip_text: "Add task",
+      valign: Gtk.Align.CENTER,
+      css_classes: ["flat"],
+    });
 
-    addGroup.add(entry);
+    const entryRow = new Adw.ActionRow();
+    entryRow.add_prefix(entry);
+    entryRow.add_suffix(addButton);
+
+    const addGroup = new Adw.PreferencesGroup({
+      title: "Add a task",
+      description:
+        "Tasks appear in the panel dropdown\u2019s \u201cSelect task\u201d menu.",
+    });
+    const listGroup = new Adw.PreferencesGroup({ title: "Your tasks" });
+
+    addGroup.add(entryRow);
     page.add(addGroup);
     page.add(listGroup);
 
@@ -105,8 +129,8 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
           );
         } else {
           const button = new Gtk.Button({
-            icon_name: "list-remove-symbolic",
-            tooltip_text: `Remove “${task}”`,
+            icon_name: "user-trash-symbolic",
+            tooltip_text: `Delete “${task}”`,
             valign: Gtk.Align.CENTER,
             css_classes: ["flat"],
           });
@@ -131,7 +155,7 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
       });
     };
 
-    entry.connect("apply", () => {
+    const addTask = () => {
       const text = entry.get_text().trim();
       const tasks = normaliseTasks(settings.get_strv("tasks-list"));
 
@@ -139,7 +163,10 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
         settings.set_strv("tasks-list", [...tasks, text]);
 
       entry.set_text("");
-    });
+    };
+
+    entry.connect("activate", addTask);
+    addButton.connect("clicked", addTask);
 
     const tasksId = settings.connect("changed::tasks-list", refresh);
     window.connect("destroy", () => settings.disconnect(tasksId));
