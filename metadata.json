@@ -1,8 +1,8 @@
 {
   "name": "Focus Tracker",
-  "description": "A simple panel button to track focused sessions against a task.",
-  "uuid": "focus-tracker@haris11.local",
-  "url": "https://github.com/haris-a11/focus-tracker-haris11.local",
-  "shell-version": ["46", "47", "48"],
+  "description": "A simple panel button to track focused sessions against a task.\n\nCompleted sessions are stored locally in a JSON file under your user data directory. Nothing is sent anywhere.",
+  "uuid": "focus-tracker@haris-a11.github.io",
+  "url": "https://github.com/haris-a11/focus-tracker",
+  "shell-version": ["46", "47", "48", "49", "50"],
   "settings-schema": "org.gnome.shell.extensions.focus-tracker"
 }

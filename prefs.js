@@ -1,52 +1,35 @@
 import Adw from "gi://Adw";
 import GLib from "gi://GLib";
 import Gtk from "gi://Gtk";
+import Gio from "gi://Gio";
 
 import { ExtensionPreferences } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 import { readSessions } from "./storage.js";
 import { DEFAULT_TASK, formatHM, normaliseTasks, summarise } from "./utils.js";
 
-function buildTaskTable(perTask) {
-  const grid = new Gtk.Grid({
-    column_homogeneous: true,
-    css_classes: ["card"],
-  });
-
-  const cell = (text, row, col, isHeader) => {
-    grid.attach(
-      new Gtk.Label({
-        label: text,
-        halign: Gtk.Align.START,
-        css_classes: isHeader ? ["dim-label", "caption-heading"] : [],
-        margin_start: 12,
-        margin_end: 12,
-        margin_top: 8,
-        margin_bottom: 8,
-      }),
-      col,
-      row,
-      1,
-      1,
-    );
-  };
-
-  cell("Task", 0, 0, true);
-  cell("Total time", 0, 1, true);
-  cell("Sessions", 0, 2, true);
-
+function buildTaskRows(group, perTask) {
   if (perTask.length === 0) {
-    cell("No sessions yet", 1, 0, false);
-    return grid;
+    group.add(new Adw.ActionRow({ title: "No sessions yet" }));
+    return;
   }
 
-  perTask.forEach(([task, { seconds, count }], i) => {
-    cell(task, i + 1, 0, false);
-    cell(formatHM(seconds), i + 1, 1, false);
-    cell(`${count}`, i + 1, 2, false);
-  });
+  for (const [task, { seconds, count }] of perTask) {
+    const row = new Adw.ActionRow({
+      title: task,
+      subtitle: `${count} session${count === 1 ? "" : "s"}`,
+    });
 
-  return grid;
+    row.add_suffix(
+      new Gtk.Label({
+        label: formatHM(seconds),
+        css_classes: ["dim-label"],
+        valign: Gtk.Align.CENTER,
+      }),
+    );
+
+    group.add(row);
+  }
 }
 
 export default class FocusTrackerPreferences extends ExtensionPreferences {
@@ -66,11 +49,20 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
 
     window.connect("destroy", () => settings.disconnect(pageId));
 
+    let focusIdleId = 0;
     window.connect("map", () => {
-      GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+      if (focusIdleId) GLib.Source.remove(focusIdleId);
+      focusIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
         window.set_focus(null);
+        focusIdleId = 0;
         return GLib.SOURCE_REMOVE;
       });
+    });
+    window.connect("destroy", () => {
+      if (focusIdleId) {
+        GLib.Source.remove(focusIdleId);
+        focusIdleId = 0;
+      }
     });
   }
 
@@ -189,9 +181,6 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
     page.add(summaryGroup);
     page.add(taskGroup);
 
-    let alive = true;
-    window.connect("destroy", () => (alive = false));
-
     const summaryRow = (title, value) => {
       const row = new Adw.ActionRow({ title });
       row.add_suffix(
@@ -204,10 +193,11 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
       summaryGroup.add(row);
     };
 
-    readSessions(this.uuid)
-      .then((sessions) => {
-        if (!alive) return;
+    const cancellable = new Gio.Cancellable();
+    window.connect("destroy", () => cancellable.cancel());
 
+    readSessions(cancellable)
+      .then((sessions) => {
         const { perTask, total, todayTotal, weekTotal, weekDays } =
           summarise(sessions);
 
@@ -219,11 +209,12 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
           formatHM(Math.round(weekTotal / weekDays)),
         );
 
-        taskGroup.add(buildTaskTable(perTask));
+        buildTaskRows(taskGroup, perTask);
       })
-      .catch((e) =>
-        console.error("focus-tracker: failed to load statistics", e),
-      );
+      .catch((e) => {
+        if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+          console.error("focus-tracker: failed to load statistics", e);
+      });
 
     return page;
   }

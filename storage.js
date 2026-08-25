@@ -20,9 +20,9 @@ const FILE_NAME = "sessions.json";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export async function readSessions(uuid) {
-  const { file } = getFile(uuid);
-  const { sessions } = await readFile(file);
+export async function readSessions(cancellable = null) {
+  const { file } = getFile();
+  const { sessions } = await readFile(file, cancellable);
 
   return sessions;
 }
@@ -44,8 +44,8 @@ export function makeSession(
   };
 }
 
-function getFile(uuid) {
-  const dir = GLib.build_filenamev([GLib.get_user_data_dir(), uuid]);
+function getFile() {
+  const dir = GLib.build_filenamev([GLib.get_user_data_dir(), "focus-tracker"]);
 
   return {
     dir: Gio.File.new_for_path(dir),
@@ -53,13 +53,15 @@ function getFile(uuid) {
   };
 }
 
-async function readFile(file) {
+async function readFile(file, cancellable = null) {
   let bytes;
 
   try {
-    [bytes] = await file.load_contents_async(null);
+    [bytes] = await file.load_contents_async(cancellable);
   } catch (e) {
-    if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
+    if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) throw e;
+
+    if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
       return { sessions: [], ok: true };
 
     console.error(`focus-tracker: failed to read ${file.get_path()}`, e);
@@ -81,8 +83,8 @@ async function readFile(file) {
 }
 
 export class SessionStore {
-  constructor(uuid, onError = null) {
-    const { dir, file } = getFile(uuid);
+  constructor(onError = null) {
+    const { dir, file } = getFile();
 
     this._dir = dir;
     this._file = file;
@@ -134,7 +136,7 @@ export class SessionStore {
     try {
       await this._dir.make_directory_async(GLib.PRIORITY_DEFAULT, null);
     } catch (e) {
-      if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS)) {
+      if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS)) {
         throw e;
       }
     }

@@ -5,7 +5,7 @@ A GNOME Shell extension that puts a stopwatch in the top panel, ties each focus 
 ![Panel indicator](docs/screenshots/panel.png)
 
 - **Shell versions:** 46, 47, 48
-- **UUID:** `focus-tracker@haris11.local`
+- **UUID:** `focus-tracker@haris-a11.github.io`
 - **License:** GPL-3.0 (see [LICENSE](LICENSE))
 
 ---
@@ -68,7 +68,7 @@ Computed from the saved session history each time the page is built:
 Sessions are stored as a JSON array in:
 
 ```
-~/.local/share/focus-tracker@haris11.local/sessions.json
+~/.local/share/focus-tracker/sessions.json
 ```
 
 Each entry looks like:
@@ -107,8 +107,8 @@ straight to the right page.
 Clone into the extensions directory under the exact UUID:
 
 ```sh
-git clone <repo> ~/.local/share/gnome-shell/extensions/focus-tracker@haris11.local
-cd ~/.local/share/gnome-shell/extensions/focus-tracker@haris11.local
+git clone https://github.com/haris-a11/focus-tracker.git ~/.local/share/gnome-shell/extensions/focus-tracker@haris-a11.github.io
+cd ~/.local/share/gnome-shell/extensions/focus-tracker@haris-a11.github.io
 glib-compile-schemas schemas/
 ```
 
@@ -120,8 +120,8 @@ Then reload the shell:
 Enable it:
 
 ```sh
-gnome-extensions enable focus-tracker@haris11.local
-gnome-extensions prefs focus-tracker@haris11.local   # open preferences
+gnome-extensions enable focus-tracker@haris-a11.github.io
+gnome-extensions prefs focus-tracker@haris-a11.github.io   # open preferences
 ```
 
 ## Development

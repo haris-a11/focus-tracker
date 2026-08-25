@@ -12,18 +12,8 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { SessionStore, makeSession } from "./storage.js";
 import { DEFAULT_TASK, formatClock, normaliseTasks } from "./utils.js";
 
-let sessionStore = null;
-
-function getSessionStore(uuid) {
-  if (!sessionStore)
-    sessionStore = new SessionStore(uuid, (message) =>
-      Main.notifyError("Focus Tracker", message),
-    );
-
-  return sessionStore;
-}
-
 const FocusButton = GObject.registerClass(
+  { GTypeName: "FocusTrackerPanelButton" },
   class FocusButton extends PanelMenu.Button {
     _init(settings, store, openPreferences) {
       super._init(0.5, "Focus tracker button");
@@ -134,7 +124,7 @@ const FocusButton = GObject.registerClass(
           return Clutter.EVENT_STOP;
         }
       }
-      return Clutter.EVENT_PROPAGATE;
+      return super.vfunc_event(event);
     }
     _elapsed() {
       if (!this._isRunning) return this._accumulated;
@@ -220,7 +210,7 @@ const FocusButton = GObject.registerClass(
 
     _stopTicking() {
       if (this._timeoutId) {
-        GLib.source_remove(this._timeoutId);
+        GLib.Source.remove(this._timeoutId);
         this._timeoutId = 0;
       }
     }
@@ -234,7 +224,9 @@ const FocusButton = GObject.registerClass(
 export default class FocusTracker extends Extension {
   enable() {
     this._settings = this.getSettings();
-    this._store = getSessionStore(this.uuid);
+    this._store = new SessionStore((message) =>
+      Main.notifyError("Focus Tracker", message),
+    );
 
     this._store.load().catch((e) => {
       console.error("focus-tracker: failed to load session store", e);
