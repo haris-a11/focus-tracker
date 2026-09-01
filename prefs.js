@@ -36,8 +36,11 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
     const settings = (window._settings = this.getSettings());
 
-    window.add(this._buildGeneralPage(settings, window));
-    window.add(this._buildStatsPage(window));
+
+    const cleanups = [];
+
+    window.add(this._buildGeneralPage(settings, window, cleanups));
+    window.add(this._buildStatsPage(window, cleanups));
 
     const landing = settings.get_string("prefs-page");
     if (landing) window.set_visible_page_name(landing);
@@ -46,8 +49,7 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
       const name = settings.get_string("prefs-page");
       if (name) window.set_visible_page_name(name);
     });
-
-    window.connect("destroy", () => settings.disconnect(pageId));
+    cleanups.push(() => settings.disconnect(pageId));
 
     let focusIdleId = 0;
     window.connect("map", () => {
@@ -58,15 +60,20 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
         return GLib.SOURCE_REMOVE;
       });
     });
-    window.connect("destroy", () => {
+    cleanups.push(() => {
       if (focusIdleId) {
         GLib.Source.remove(focusIdleId);
         focusIdleId = 0;
       }
     });
+
+   
+    window.connect("close-request", () => {
+      for (const cleanup of cleanups) cleanup();
+    });
   }
 
-  _buildGeneralPage(settings, window) {
+  _buildGeneralPage(settings, window, cleanups) {
     const page = new Adw.PreferencesPage({
       title: "General",
       name: "general",
@@ -161,14 +168,14 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
     addButton.connect("clicked", addTask);
 
     const tasksId = settings.connect("changed::tasks-list", refresh);
-    window.connect("destroy", () => settings.disconnect(tasksId));
+    cleanups.push(() => settings.disconnect(tasksId));
 
     refresh();
 
     return page;
   }
 
-  _buildStatsPage(window) {
+  _buildStatsPage(window, cleanups) {
     const page = new Adw.PreferencesPage({
       title: "Statistics",
       name: "statistics",
@@ -194,7 +201,7 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
     };
 
     const cancellable = new Gio.Cancellable();
-    window.connect("destroy", () => cancellable.cancel());
+    cleanups.push(() => cancellable.cancel());
 
     readSessions(cancellable)
       .then((sessions) => {
