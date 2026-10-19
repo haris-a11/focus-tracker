@@ -4,11 +4,12 @@ A GNOME Shell extension that puts a stopwatch in the top panel, ties each focus 
 
 ![Panel indicator](docs/screenshots/panel.png)
 
-- **Shell versions:** 46, 47, 48
-- **UUID:** `focus-tracker@haris-a11.github.io`
-- **License:** GPL-3.0 (see [LICENSE](LICENSE))
+ - **Shell versions:** 46, 47, 48
+ - **UUID:** `focus-tracker@haris-a11.github.io`
+ - **License:** GPL-3.0 (see [LICENSE](LICENSE))
 
 ---
+
 
 ## Features
 
