@@ -1,6 +1,19 @@
 import GLib from "gi://GLib";
 
 export const DEFAULT_TASK = "Focus";
+export const POMODORO_SECONDS = 25 * 60;
+
+export function completedPomodoros(durationSeconds) {
+  if (!Number.isFinite(durationSeconds)) return 0;
+
+  return Math.max(0, Math.floor(Math.max(0, durationSeconds) / POMODORO_SECONDS));
+}
+
+export function formatPomodoros(count) {
+  const total = Math.max(0, Math.round(count));
+
+  return `${total} pomodoro${total === 1 ? "" : "s"}`;
+}
 
 export function normaliseTasks(tasks) {
   const seen = new Set();
@@ -58,8 +71,11 @@ export function summarise(sessions) {
   const byTask = new Map();
 
   let total = 0;
+  let totalPomodoros = 0;
   let todayTotal = 0;
+  let todayPomodoros = 0;
   let weekTotal = 0;
+  let weekPomodoros = 0;
   let counted = 0;
 
   for (const session of sessions) {
@@ -67,32 +83,48 @@ export function summarise(sessions) {
 
     const raw = session.duration_seconds;
     const duration = Number.isFinite(raw) ? raw : 0;
+    const pomodoros = Number.isFinite(session.pomodoros)
+      ? Math.max(0, Number(session.pomodoros))
+      : completedPomodoros(duration);
 
     const task =
       typeof session.task === "string" && session.task
         ? session.task
         : DEFAULT_TASK;
 
-    const entry = byTask.get(task) ?? { seconds: 0, count: 0 };
+    const entry = byTask.get(task) ?? { seconds: 0, count: 0, pomodoros: 0 };
     entry.seconds += duration;
     entry.count += 1;
+    entry.pomodoros += pomodoros;
     byTask.set(task, entry);
 
     total += duration;
+    totalPomodoros += pomodoros;
     counted += 1;
 
     const day = localDay(session.start);
-    if (day === today) todayTotal += duration;
-    if (day && day >= weekStart) weekTotal += duration;
+    if (day === today) {
+      todayTotal += duration;
+      todayPomodoros += pomodoros;
+    }
+    if (day && day >= weekStart) {
+      weekTotal += duration;
+      weekPomodoros += pomodoros;
+    }
   }
 
-  const perTask = [...byTask].sort((a, b) => b[1].seconds - a[1].seconds);
+  const perTask = [...byTask]
+    .map(([task, data]) => [task, { ...data }])
+    .sort((a, b) => b[1].seconds - a[1].seconds);
 
   return {
     perTask,
     total,
+    totalPomodoros,
     todayTotal,
+    todayPomodoros,
     weekTotal,
+    weekPomodoros,
     weekDays: now.get_day_of_week(),
     counted,
   };
