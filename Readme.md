@@ -57,10 +57,11 @@ The task list is shared live with the panel menu through GSettings, so edits sho
 Computed from the saved session history each time the page is built:
 
 - **Total focus time (all-time)**
+- **Completed pomodoros (all-time)** — every completed 25-minute focus block, counted per-task and overall
 - **Today** — sessions whose start date is today (local time)
 - **This week** — sessions since Monday (local time)
 - **This week — daily average** — the week total divided by the number of days elapsed so far this week, so a partial week is not diluted by days that have not happened yet
-- **Per-task breakdown** — total time and session count per task, sorted by time descending
+- **Per-task breakdown** — total time, session count, and completed pomodoros per task, sorted by time descending
 
 ---
 
@@ -81,7 +82,8 @@ Each entry looks like:
   "mode": "stopwatch",
   "start": "2026-08-22T16:41:07+05:30",
   "end": "2026-08-22T17:07:50+05:30",
-  "duration_seconds": 1603
+  "duration_seconds": 1603,
+  "pomodoros": 1
 }
 ```
 

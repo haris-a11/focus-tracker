@@ -1,6 +1,8 @@
 import GLib from "gi://GLib";
 import Gio from "gi://Gio";
 
+import { completedPomodoros } from "./utils.js";
+
 Gio._promisify(
   Gio.File.prototype,
   "load_contents_async",
@@ -34,6 +36,8 @@ export function makeSession(
   duration,
   type = "stopwatch",
 ) {
+  const pomodoros = completedPomodoros(duration);
+
   return {
     id: GLib.uuid_string_random(),
     task,
@@ -41,6 +45,7 @@ export function makeSession(
     start: startTime.format_iso8601(),
     end: endTime.format_iso8601(),
     duration_seconds: duration,
+    pomodoros,
   };
 }
 

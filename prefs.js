@@ -6,7 +6,13 @@ import Gio from "gi://Gio";
 import { ExtensionPreferences } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 import { readSessions } from "./storage.js";
-import { DEFAULT_TASK, formatHM, normaliseTasks, summarise } from "./utils.js";
+import {
+  DEFAULT_TASK,
+  formatHM,
+  formatPomodoros,
+  normaliseTasks,
+  summarise,
+} from "./utils.js";
 
 function buildTaskRows(group, perTask) {
   if (perTask.length === 0) {
@@ -14,10 +20,10 @@ function buildTaskRows(group, perTask) {
     return;
   }
 
-  for (const [task, { seconds, count }] of perTask) {
+  for (const [task, { seconds, count, pomodoros = 0 }] of perTask) {
     const row = new Adw.ActionRow({
       title: task,
-      subtitle: `${count} session${count === 1 ? "" : "s"}`,
+      subtitle: `${count} session${count === 1 ? "" : "s"} • ${formatPomodoros(pomodoros)}`,
     });
 
     row.add_suffix(
@@ -205,12 +211,23 @@ export default class FocusTrackerPreferences extends ExtensionPreferences {
 
     readSessions(cancellable)
       .then((sessions) => {
-        const { perTask, total, todayTotal, weekTotal, weekDays } =
-          summarise(sessions);
+        const {
+          perTask,
+          total,
+          totalPomodoros,
+          todayTotal,
+          todayPomodoros,
+          weekTotal,
+          weekPomodoros,
+          weekDays,
+        } = summarise(sessions);
 
         summaryRow("Total focus time (all-time)", formatHM(total));
+        summaryRow("Completed pomodoros (all-time)", formatPomodoros(totalPomodoros));
         summaryRow("Today", formatHM(todayTotal));
+        summaryRow("Today — pomodoros", formatPomodoros(todayPomodoros));
         summaryRow("This week", formatHM(weekTotal));
+        summaryRow("This week — pomodoros", formatPomodoros(weekPomodoros));
         summaryRow(
           "This week — daily average",
           formatHM(Math.round(weekTotal / weekDays)),
